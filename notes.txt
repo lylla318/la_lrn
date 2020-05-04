@@ -1,0 +1,54 @@
+RSEI data: ftp://newftp.epa.gov/RSEI/
+microdata data dictionary: https://www.epa.gov/rsei/rsei-data-dictionary-disaggregated-microdata
+
+to get Odo working: https://github.com/blaze/odo/pull/443/commits/b97974114952fac2dcfcf4c4b3447f2e0d513bef
+
+
+####
+
+select m."5",f.facilityname,sum(m."9") from micro_2017_louisiana as m, rsei_facilities as f where m."1" = 649 and m."2" = 976 and f.facilitynumber = m."5" group by m."5",f.facilityname order by sum desc;
+
+
+####
+
+St. John chem grid:
+
+select chemicals.chemical, micro."4" as chem, sum(micro."8") as toxconc,grid.x,grid.y
+from micro_2017_louisiana as micro, rsei_louisiana as grid, rsei_chemicals as chemicals
+where grid.blockid00::varchar like '22095%' and grid.x = micro."1" and grid.y = micro."2" and micro."4" = chemicals.chemicalnumber
+and micro."8" > 0
+group by chemicals.chemical,chem,grid.x,grid.y
+
+
+St. John/St. James/St. Charles CONC grid w fips
+
+select chemicals.chemical, micro."4" as chem, sum(micro."7") as conc,grid.x,grid.y,substring(grid.blockid00::varchar,1,5) as fips
+from micro_2017_louisiana as micro, rsei_louisiana as grid, rsei_chemicals as chemicals
+where (grid.blockid00::varchar like '22095%' or grid.blockid00::varchar like '22089%' or grid.blockid00::varchar like '22093%') and grid.x = micro."1" and grid.y = micro."2" and micro."4" = chemicals.chemicalnumber
+and chemicals.rfcinhale is not null
+and micro."8" > 0
+group by chemicals.chemical,chem,grid.x,grid.y,grid.blockid00
+
+chemicals table:
+
+select distinct on (chemicals.chemical) chemicals.chemical,chemicals.rfcinhale,chemicals.rfcconf,chemicals.unitriskinhale
+from micro_2017_louisiana as micro, rsei_louisiana as grid, rsei_chemicals as chemicals
+where (grid.blockid00::varchar like '22095%' or grid.blockid00::varchar like '22089%' or grid.blockid00::varchar like '22093%') and grid.x = micro."1" and grid.y = micro."2" and micro."4" = chemicals.chemicalnumber
+and micro."8" > 0
+and rfcinhale is not null
+group by chemicals.chemical,chemicals.rfcinhale,chemicals.rfcconf,chemicals.unitriskinhale
+
+
+###
+generate the geojson
+
+ogr2ogr -f "GeoJSON" -sql "select x,y,wkb_geometry from rsei_louisiana where blockid00::varchar like '22095%' or blockid00::varchar like '22089%' or blockid00::varchar like '22093%'" st-john-stjames-st-charles.geojson PG:dbname=la_lrn
+
+####
+
+toxics scaling
+
+
+https://www3.epa.gov/ttn/chief/conference/ei16/session6/wright.pdf
+
+https://www.epa.gov/fera/dose-response-assessment-assessing-health-risks-associated-exposure-hazardous-air-pollutants
